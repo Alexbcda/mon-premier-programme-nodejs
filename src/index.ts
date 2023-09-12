@@ -1,116 +1,75 @@
-// const fs = require("fs")
-import fs, { outputJsonSync } from "fs-extra"
+import express, { Request, Response } from 'express';
+import { Sequelize, DataTypes, Model } from 'sequelize';
 
-console.log("Hello world")
-console.log(process.argv)
+const app = express();
+const port = 5000;
 
-if (process.argv.includes("--help")) {
-  console.log("Je vais vous aider")
-} else {
-  console.log("Débrouille toi")
+// Configuration Sequelize pour la base de données SQLite
+const sequelize = new Sequelize({
+  dialect: 'sqlite',
+  storage: 'database.sqlite',
+});
+
+// Modèle Sequelize pour les tâches (Todo)
+class Task extends Model {
+  public id!: number;
+  public titre!: string;
+  public description!: string;
+  public fait!: boolean;
 }
 
-if (process.argv.includes("--name")) {
-  const posArgName = process.argv.indexOf("--name")
-  const posName = posArgName + 1
-  const name = process.argv[posName]
-  console.log("Bonjour " + name)
-}
+Task.init(
+  {
+    titre: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    fait: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+  },
+  {
+    sequelize,
+    modelName: 'Task',
+  }
+);
 
-// 1 - créer un objet "personne" avec les propriétés suivantes : nom, prenom, age, sexe
-// 2 - loguer l'objet
-// 3 - changer le nom et le prenom par Laforge et Thomas
-// 4 - loguer l'objet initial et l'objet modifié
-// 5 - créer un objet "personne2" à partir de la première personne (copie)
-// 6 - changer le nom et le prenom de la personne2 par Amish et Fatir
-// 7 - loguer les trois objets
+// Créez la table dans la base de données si elle n'existe pas encore
+sequelize.sync();
 
-// const todos = [
-//     {
-//         name: 'tache 1',
-//         status: true
-//     },
-//     {
-//         name: 'tache 2',
-//         status: false
-//     }
-// ]
+// Middleware pour permettre l'analyse des données JSON
+app.use(express.json());
 
-// const todosName = ["tache 3", "tache 2"]
-// const todosStatus = [true, false]
+// Route GET pour récupérer toutes les tâches
+app.get('/tasks', async (req: Request, res: Response) => {
+  try {
+    const tasks = await Task.findAll();
+    res.json(tasks);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des tâches :', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
-interface IPersonne {
-  nom: string
-  prenom: string
-  age: number
-  sexe: string
-}
+// Route POST pour créer une nouvelle tâche
+app.post('/tasks', async (req: Request, res: Response) => {
+  try {
+    const { titre, description } = req.body;
+    const task = await Task.create({ titre, description });
+    res.status(201).json(task);
+  } catch (error) {
+    console.error('Erreur lors de la création de la tâche :', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
-const p: IPersonne = {
-  nom: "fopjhpjopj",
-  prenom: "jfsdkjfsfsf",
-  age: 32,
-  sexe: "homme",
-}
-
-console.log("p initial", p)
-
-p.prenom = "Thomas"
-p.nom = "Laforge"
-
-console.log("p modifié en Thomas Laforge", p)
-
-const p2: IPersonne = {
-  ...p,
-  prenom: "Fatir",
-}
-
-p2.nom = "Amish"
-
-console.log("p2", p, p2)
-
-const file = "./file.json"
-outputJsonSync(file, p2)
-
-const data = fs.readJsonSync(file)
-console.log(data) // => JP
-
-import "dotenv/config"
-
-console.log("env", process.env.NAME)
-
-import express from 'express'
-import path from "path"
-import { rootCertificates } from "tls"
-const app = express()
-const port = 8878
-
-app.use(express.static('public'))
-
-app.get('/toto', (req, res) => {
-  res.send('Hello World!')
-})
-
-app.get('/tata', (req, res) => {
-  res.send(JSON.stringify(p2))
-})
-
-app.get('/random-between/:min/:max', (req, res) => {
-  const min = parseInt(req.params.min)
-  const max = parseInt(req.params.max)
-  const random = Math.floor(Math.random() * (max - min + 1)) + min
-  res.send(random.toString())
-})
-
-// Create a route who return the image on /public/image.jpg
-app.get('/simplon/logo', (req, res) => {
-  res.sendFile('logo.png', { root: path.resolve(__dirname, "../public")})
-})
-
-app.get('/simplon/web', (req, res) => {
-  res.sendFile('index.html', { root: path.resolve(__dirname, "../public")})
-})
-
+// Écoutez les requêtes HTTP sur le port spécifié
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`Serveur API en écoute sur le port ${port}`);
+});
